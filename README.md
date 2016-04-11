@@ -21,7 +21,9 @@ returns a collection of maps describing cleavage sites:
 clj-protease.core> (def tsf "MTCSRQFTSSSSMKGSCGIGGGIGGGS .... GKVVSTHEQVLRTKN")
 #'clj-protease.core/tsf
 clj-protease.core> (scan-sequence tsf "Trypsin")
-({:motif-start 443, :motif "SRQ", :cleave-after 444} {:motif-start 164, :motif "FKT", :cleave-after 165} {:motif-start 240, :motif "LKE", :cleave-after 241} ...)
+({:motif-start 443, :motif "SRQ", :cleave-after 444}
+ {:motif-start 164, :motif "FKT", :cleave-after 165}
+ {:motif-start 240, :motif "LKE", :cleave-after 241} ...)
 clj-protease.core> 
 ```
 
