@@ -6,7 +6,9 @@ Some simple utilities for analysing protease cleavage of protein sequences.
 
 Install through lein in project file:
 
+```clj
 [clj-protease "0.1.0"]
+```
 
 Include by:
 
