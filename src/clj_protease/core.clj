@@ -1,7 +1,8 @@
 (ns clj-protease.core
   (:require [clojure.edn :as edn]
             [clojure.java.io :refer [resource]]
-            [clojure.string :as str]))
+            [clojure.string :as str]
+            [clojure.set :as set]))
 
 (declare protease)
 
@@ -57,8 +58,10 @@
   results."
   [pre post prot]
   (let [p (protease prot)
-        r (and (matches? (fn [s c] (s c)) (:pre p) (reverse pre))
-               (matches? (fn [s c] (s c)) (:post p) (seq post)))]
+        r (and (->> (map (fn [s c] (s c)) (:pre p) (reverse pre))
+                    (every? #(not (nil? %))))
+               (->> (map (fn [s c] (s c)) (:post p) (seq post))
+                    (every? #(not (nil? %)))))]
     (if (and r (:not p))
       (let [cs (str (apply str (->> (reverse pre) (take 2) reverse))
                     (first post))]
@@ -217,7 +220,7 @@ GEDAHLSSSQFSSGSQSSRDVTSSSRQIRTKVMDVHDGKVVSTHEQVLRTKN")
     :cleave-after 3
     :pre [#{\D} #{\T} #{\E} #{\I \L}]
     :post [(restrict-set #{\D \E \K \P \Q \R})]}
-   "Caspase-9 "
+   "Caspase-9"
    {:synonyms "ICE-Lap6, Mch6"
     :re #"(?=(LEHD[A-Z]))"
     :cleave-after 3
@@ -253,12 +256,6 @@ GEDAHLSSSQFSSGSQSSRDVTSSSRQIRTKVMDVHDGKVVSTHEQVLRTKN")
     :cleave-after 0
     :pre [#{\H}]
     :post [(restrict-set #{\D \M \P \W})]}
-   "Chymotrypsin (low specificity)-c"
-   {:synonyms ""
-    :re #"(?=(W[^ M P]))"
-    :cleave-after 0
-    :pre [#{\W}]
-    :post [(restrict-set #{\P \M})]}
    "Clostripain"
    {:synonyms "Clostridiopeptidase B"
     :re #"(?=(R[A-Z]))"
@@ -443,8 +440,8 @@ GEDAHLSSSQFSSGSQSSRDVTSSSRQIRTKVMDVHDGKVVSTHEQVLRTKN")
    {:synonyms "Factor IIa"
     :re #"(?=(GRG))"
     :cleave-after 1
-    :pre [#{\R} #{\P} #{\A \F \G \I \L \T \V \W} #{\A \F \G \I \L \T \V \W}]
-    :post [(restrict-set #{\D \E}) (restrict-set #{\D \E})]}
+    :pre [#{\R} #{\G}]
+    :post [#{\G}]}
    "Thrombin-a"
    {:synonyms "Factor IIa"
     :re #"(?=([A F G I L T V W][A F G I L T V W]PR[^ D E][^ D E]))"
@@ -495,3 +492,59 @@ GEDAHLSSSQFSSGSQSSRDVTSSSRQIRTKVMDVHDGKVVSTHEQVLRTKN")
     :not [#"[CD]KD" #"CK[HY]" #"RR[HR]"]
     :pre [#{\R}]
     :post [(restrict-set #{\P})]}})
+
+;; collapsing identical sites
+
+(def specificity
+  [;; \R
+   [#{"Arg-C"} ["Clostripain"]]
+   [#{"Thrombin" "Factor Xa" "Thrombin-a" "Trypsin" "Trypsin-b"
+      "Trypsin (Cys modified)" "Trypsin (Lys blocked)"}
+    ["Arg-C"]]
+   [#{"Factor Xa"} ["Thrombin"]]
+   [#{"Thrombin-a"} ["Factor Xa" "Trypsin" "Trypsin (Cys modified)"
+                     "Trypsin (Lys blocked)"]]
+   [#{"Trypsin"} ["Trypsin (Cys modified)" "Trypsin (Lys blocked)"]]
+   ;; \K
+   [#{"Trypsin" "Trypsin (Arg blocked)" "Trypsin (Cys modified)" "Trypsin-a"
+      "Enterokinase"}
+    ["Lys-C"]]
+   [#{"Trypsin"} ["Trypsin (Arg blocked)" "Trypsin (Cys modified)"]]
+   [#{"Enterokinase"} ["Trypsin"]]
+   ;; \W
+   [#{"Proteinase K"} ["Iodosobenzoic acid" "BNPS"]]
+   [#{"Chymotrypsin-a" "Pepsin A-a"} ["Proteinase K"]]
+   [#{"Pepsin A-a"} ["Chymotrypsin-a"]]
+   [#{"Caspase-1" "Caspase-10" "Caspase-2" "Caspase-2a" "Caspase-3"
+      "Caspase-3a" "Caspase-4" "Caspase-4a" "Caspase-5" "Caspase-6"
+      "Caspase-7" "Caspase 8" "Caspase-9" "Granzyme B" }]]
+
+  {
+   \D [[#(not (= % "Formic acid")) #{"Formic acid"}]
+       [#{"Caspase-9"} #{"Caspase-1" "Caspase-5"}]
+       [#{"Caspase-8"} #{"Caspase-1"}]
+       [#{"Caspase-5"} #{"Caspase-1"}]]
+   \F [[#(not (= % "Proteinase K")) #{"Proteinase K"}]
+       [#{"Chymotrypsin"} #{"Chymotrypsin (low specificity)"}]
+       [#{"Pepsin A-a"} #{"Chymotrypsin" "Pepsin A (low specificity)-a"}]]
+   \Y [[#(not (= % "Proteinase K")) #{"Proteinase K"}]
+       [#{"Chymotrypsin"} #{"Chymotrypsin (low specificity)"}]
+       [#{"Pepsin A-a"} #{"Chymotrypsin" "Pepsin A (low specificity)-a"}]]
+   \L [[#(not (= % "Proteinase K")) #{"Proteinase K"}]
+       [#{"Pepsin A-a"} #{"Pepsin A (low specificity)-a"}]]
+   \M [[#(not (= % "CNBr")) #{"CNBr"}]]
+   \E [[#(not (= % "Glu-C (AmAc buffer)")) #{"Glu-C (AmAc buffer)"}]
+       [#{"Proteinase K"} #{"Glu-C (Phos buffer)"}]]})
+
+(defn collapse
+  [pre coll]
+  (let [t (specificity pre)
+        r (->> (mapcat (fn [[k v]]
+                         (if (some k coll) v))
+                       t)
+               (remove nil?)
+               set)
+        c (->> (remove r coll))]
+    (if-let [r (seq (remove #{"Asp-N" "Asp-N (N-terminal Glu)"} c))]
+      (vec r)
+      (remove #{"Asp-N (N-terminal Glu)"} coll))))
